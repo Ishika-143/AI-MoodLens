@@ -1,13 +1,15 @@
 import streamlit as st
 import cv2
 import numpy as np
+from PIL import Image
+import onnxruntime as ort
 from pathlib import Path
 import time
 
-# =========================================================
-# AI MOODLENS
-# Python + OpenCV + Machine Learning + ONNX
-# =========================================================
+
+# ============================================================
+# PAGE CONFIG
+# ============================================================
 
 st.set_page_config(
     page_title="AI MoodLens",
@@ -16,11 +18,225 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# =========================================================
-# PATHS
-# =========================================================
 
-BASE_DIR = Path(__file__).parent
+# ============================================================
+# PREMIUM UI
+# ============================================================
+
+st.markdown("""
+<style>
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: "DM Sans", sans-serif;
+}
+
+.stApp {
+    background:
+        radial-gradient(circle at 10% 5%, rgba(139,92,246,0.15), transparent 25%),
+        radial-gradient(circle at 90% 10%, rgba(59,130,246,0.12), transparent 25%),
+        radial-gradient(circle at 50% 100%, rgba(124,58,237,0.10), transparent 35%),
+        #080711;
+    color: #f5f3ff;
+}
+
+.block-container {
+    max-width: 1250px;
+    padding-top: 3rem;
+    padding-bottom: 4rem;
+}
+
+#MainMenu {
+    visibility: hidden;
+}
+
+footer {
+    visibility: hidden;
+}
+
+header {
+    background: transparent !important;
+}
+
+/* Main title */
+
+h1 {
+    font-family: "Space Grotesk", sans-serif !important;
+    font-size: 4.2rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -2px;
+    background: linear-gradient(
+        90deg,
+        #ffffff,
+        #c4b5fd,
+        #93c5fd
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.3rem !important;
+}
+
+h2 {
+    font-family: "Space Grotesk", sans-serif !important;
+    color: #ede9fe !important;
+}
+
+h3 {
+    font-family: "Space Grotesk", sans-serif !important;
+    color: #ddd6fe !important;
+}
+
+p {
+    color: #aaa4c5;
+}
+
+hr {
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(139,92,246,0.45),
+        transparent
+    ) !important;
+    margin: 2rem 0 !important;
+}
+
+/* Buttons */
+
+.stButton > button {
+    width: 100%;
+    min-height: 50px;
+    border-radius: 15px;
+    border: 1px solid rgba(167,139,250,0.3);
+    background: linear-gradient(
+        135deg,
+        #7c3aed,
+        #2563eb
+    );
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+    box-shadow: 0 10px 35px rgba(124,58,237,0.25);
+    transition: all 0.25s ease;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 45px rgba(124,58,237,0.38);
+}
+
+/* Camera / uploader */
+
+[data-testid="stFileUploader"] {
+    background: rgba(20,18,34,0.75);
+    border: 1px solid rgba(139,92,246,0.20);
+    border-radius: 22px;
+    padding: 12px;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background: rgba(10,9,20,0.7) !important;
+    border: 1px dashed rgba(167,139,250,0.35) !important;
+    border-radius: 16px !important;
+}
+
+/* Containers */
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(17,15,29,0.72);
+    border: 1px solid rgba(139,92,246,0.15);
+    border-radius: 22px;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.025),
+        0 20px 60px rgba(0,0,0,0.22);
+}
+
+/* Metrics */
+
+[data-testid="stMetric"] {
+    background: rgba(16,14,29,0.78);
+    border: 1px solid rgba(139,92,246,0.15);
+    padding: 18px;
+    border-radius: 18px;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #a8a0c0 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #f5f3ff !important;
+    font-family: "Space Grotesk", sans-serif;
+}
+
+/* Progress */
+
+.stProgress > div > div > div > div {
+    background: linear-gradient(
+        90deg,
+        #8b5cf6,
+        #3b82f6
+    );
+    border-radius: 20px;
+}
+
+.stProgress > div > div {
+    background: rgba(255,255,255,0.07);
+    border-radius: 20px;
+}
+
+/* Alerts */
+
+[data-testid="stAlert"] {
+    border-radius: 16px !important;
+    border: 1px solid rgba(139,92,246,0.18) !important;
+    background: rgba(17,15,29,0.75) !important;
+}
+
+/* Images */
+
+[data-testid="stImage"] img {
+    border-radius: 20px;
+    border: 1px solid rgba(139,92,246,0.18);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+/* Tabs */
+
+button[data-baseweb="tab"] {
+    color: #9f97b7 !important;
+    font-weight: 600;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #c4b5fd !important;
+}
+
+[data-baseweb="tab-highlight"] {
+    background: #8b5cf6 !important;
+}
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2.8rem !important;
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+    }
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# PATHS
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
 
 MODEL_PATH = (
     BASE_DIR
@@ -28,871 +244,798 @@ MODEL_PATH = (
     / "facial_expression_recognition_mobilefacenet_2022july.onnx"
 )
 
-# =========================================================
+
+# ============================================================
 # EMOTIONS
-# =========================================================
+# ============================================================
 
 EMOTIONS = [
     "angry",
     "disgust",
-    "fearful",
+    "fear",
     "happy",
-    "neutral",
     "sad",
-    "surprised"
+    "surprise",
+    "neutral"
 ]
 
-EMOTION_EMOJI = {
-    "angry": "😠",
-    "disgust": "🤢",
-    "fearful": "😨",
-    "happy": "😊",
-    "neutral": "😐",
-    "sad": "😔",
-    "surprised": "😮"
-}
 
-# =========================================================
-# SESSION HISTORY
-# =========================================================
-
-if "emotion_history" not in st.session_state:
-    st.session_state.emotion_history = []
-
-if "confidence_history" not in st.session_state:
-    st.session_state.confidence_history = []
-
-if "scan_count" not in st.session_state:
-    st.session_state.scan_count = 0
-
-if "last_emotion" not in st.session_state:
-    st.session_state.last_emotion = "None"
-
-# =========================================================
-# CUSTOM CSS
-# =========================================================
-
-st.markdown(
-    """
-    <style>
-
-    .stApp {
-        background:
-            radial-gradient(
-                circle at 10% 10%,
-                rgba(124, 58, 237, 0.15),
-                transparent 25%
-            ),
-            radial-gradient(
-                circle at 90% 10%,
-                rgba(14, 165, 233, 0.12),
-                transparent 25%
-            ),
-            #080912;
-    }
-
-    .main .block-container {
-        max-width: 1450px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-    }
-
-    h1 {
-        font-size: 3.8rem !important;
-        font-weight: 800 !important;
-        letter-spacing: -2px;
-        text-align: center;
-    }
-
-    h2, h3 {
-        font-weight: 750 !important;
-    }
-
-    [data-testid="stMetric"] {
-        background: rgba(255,255,255,0.035);
-        border: 1px solid rgba(255,255,255,0.08);
-        padding: 18px;
-        border-radius: 16px;
-    }
-
-    hr {
-        border-color: rgba(255,255,255,0.08);
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# =========================================================
+# ============================================================
 # LOAD MODELS
-# =========================================================
+# ============================================================
 
 @st.cache_resource
 def load_models():
 
+    # --------------------------------------------------------
+    # Face detector
+    # --------------------------------------------------------
+
     cascade_file = (
-        cv2.data.haarcascades
-        + "haarcascade_frontalface_default.xml"
+        Path(cv2.__file__).resolve().parent
+        / "data"
+        / "haarcascade_frontalface_default.xml"
     )
 
+    if not cascade_file.exists():
+
+        # fallback location used by OpenCV installations
+        cascade_file = (
+            Path(cv2.data.haarcascades)
+            / "haarcascade_frontalface_default.xml"
+        )
+
+    if not cascade_file.exists():
+        raise FileNotFoundError(
+            "Haar Cascade file was not found. "
+            "Please check OpenCV installation."
+        )
+
     face_detector = cv2.CascadeClassifier(
-        cascade_file
+        str(cascade_file)
     )
 
     if face_detector.empty():
-        return None, None
+        raise RuntimeError(
+            "OpenCV could not load the Haar Cascade file."
+        )
+
+    # --------------------------------------------------------
+    # Emotion model
+    # --------------------------------------------------------
 
     if not MODEL_PATH.exists():
-        return face_detector, None
+        raise FileNotFoundError(
+            f"Emotion model not found:\n{MODEL_PATH}"
+        )
 
-    expression_model = cv2.dnn.readNet(
-        str(MODEL_PATH)
+    expression_model = ort.InferenceSession(
+        str(MODEL_PATH),
+        providers=["CPUExecutionProvider"]
     )
 
     return face_detector, expression_model
 
 
-face_detector, expression_model = load_models()
+# ============================================================
+# LOAD MODEL SAFELY
+# ============================================================
 
-# =========================================================
-# MODEL CHECK
-# =========================================================
+try:
 
-if face_detector is None:
-    st.error("OpenCV face detector could not be loaded.")
+    face_detector, expression_model = load_models()
+
+except Exception as e:
+
+    st.error("⚠️ AI model setup failed.")
+
+    st.code(str(e))
+
     st.stop()
 
-if expression_model is None:
-    st.error("Facial expression ONNX model was not found.")
-    st.info(
-        "Required file:\n\n"
-        "models/facial_expression_recognition_mobilefacenet_2022july.onnx"
+
+# ============================================================
+# IMAGE PREPROCESSING
+# ============================================================
+
+def preprocess_face(face):
+
+    face = cv2.cvtColor(
+        face,
+        cv2.COLOR_BGR2GRAY
     )
-    st.stop()
 
-# =========================================================
+    face = cv2.resize(
+        face,
+        (112, 112)
+    )
+
+    face = face.astype(
+        np.float32
+    ) / 255.0
+
+    face = (face - 0.5) / 0.5
+
+    face = np.expand_dims(
+        face,
+        axis=0
+    )
+
+    face = np.expand_dims(
+        face,
+        axis=0
+    )
+
+    return face.astype(np.float32)
+
+
+# ============================================================
+# EMOTION PREDICTION
+# ============================================================
+
+def predict_emotion(face):
+
+    input_name = expression_model.get_inputs()[0].name
+    output_name = expression_model.get_outputs()[0].name
+
+    input_tensor = preprocess_face(face)
+
+    outputs = expression_model.run(
+        [output_name],
+        {
+            input_name: input_tensor
+        }
+    )
+
+    raw_output = np.asarray(
+        outputs[0]
+    ).squeeze()
+
+    # Softmax
+    exp_values = np.exp(
+        raw_output - np.max(raw_output)
+    )
+
+    probabilities = (
+        exp_values /
+        np.sum(exp_values)
+    )
+
+    emotion_index = int(
+        np.argmax(probabilities)
+    )
+
+    emotion = EMOTIONS[
+        emotion_index
+    ]
+
+    confidence = float(
+        probabilities[emotion_index]
+    )
+
+    all_predictions = [
+        (EMOTIONS[i], float(probabilities[i]))
+        for i in range(
+            len(EMOTIONS)
+        )
+    ]
+
+    all_predictions.sort(
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return (
+        emotion,
+        confidence,
+        all_predictions
+    )
+
+
+# ============================================================
+# EMOTION DISPLAY
+# ============================================================
+
+EMOTION_INFO = {
+
+    "happy": {
+        "emoji": "😊",
+        "title": "Happy",
+        "description": "The facial features show patterns associated with a positive emotional expression."
+    },
+
+    "sad": {
+        "emoji": "😔",
+        "title": "Sad",
+        "description": "The facial features show patterns associated with a subdued emotional expression."
+    },
+
+    "angry": {
+        "emoji": "😠",
+        "title": "Angry",
+        "description": "The facial features show patterns associated with an intense emotional expression."
+    },
+
+    "fear": {
+        "emoji": "😨",
+        "title": "Fear",
+        "description": "The facial features show patterns associated with an alert or fearful expression."
+    },
+
+    "surprise": {
+        "emoji": "😮",
+        "title": "Surprised",
+        "description": "The facial features show patterns associated with a surprised expression."
+    },
+
+    "disgust": {
+        "emoji": "🤢",
+        "title": "Disgust",
+        "description": "The facial features show patterns associated with a disgusted expression."
+    },
+
+    "neutral": {
+        "emoji": "😐",
+        "title": "Neutral",
+        "description": "The facial features show patterns associated with a neutral expression."
+    }
+}
+
+
+# ============================================================
 # HERO
-# =========================================================
-
-st.write("")
-
-st.caption(
-    "✦ COMPUTER VISION  •  MACHINE LEARNING  •  ONNX"
-)
-
-st.title("🧠 AI MoodLens")
+# ============================================================
 
 st.markdown(
-    """
-    <div style="text-align:center;">
-    <p style="color:#9295a8; font-size:1.05rem;">
-    Understand visible facial expressions using
-    AI-powered computer vision.
-    </p>
-    </div>
-    """,
-    unsafe_allow_html=True
+    "### AI-POWERED COMPUTER VISION",
+)
+
+st.title("AI MoodLens")
+
+st.subheader(
+    "See the emotion behind the expression."
+)
+
+st.write(
+    "MoodLens uses computer vision and machine learning "
+    "to analyze facial expressions and estimate the "
+    "most likely emotional state."
 )
 
 st.write("")
 
-status1, status2, status3 = st.columns(3)
+metric1, metric2, metric3 = st.columns(3)
 
-with status1:
-    st.success("● Camera System Ready")
+with metric1:
+    st.metric(
+        "🧠 Technology",
+        "Computer Vision"
+    )
 
-with status2:
-    st.info("● AI Model Loaded")
+with metric2:
+    st.metric(
+        "⚡ Processing",
+        "ONNX + CPU"
+    )
 
-with status3:
-    st.success("● Detection Online")
+with metric3:
+    st.metric(
+        "🎭 Emotions",
+        "7 Classes"
+    )
 
 st.divider()
 
-# =========================================================
-# MAIN WORKSPACE
-# =========================================================
 
-left, right = st.columns(
-    [1.2, 0.95],
-    gap="large"
+# ============================================================
+# INPUT MODE
+# ============================================================
+
+st.subheader("🎥 Start Emotion Analysis")
+
+mode = st.radio(
+    "Choose analysis method",
+    [
+        "📷 Camera",
+        "🖼️ Upload Image"
+    ],
+    horizontal=True
 )
 
-# =========================================================
-# CAMERA
-# =========================================================
 
-with left:
+# ============================================================
+# GET IMAGE
+# ============================================================
 
-    st.subheader("📷 Live Expression Scanner")
+image = None
 
-    st.caption(
-        "Capture a clear image of your face to begin AI analysis."
-    )
+
+if mode == "📷 Camera":
 
     camera_image = st.camera_input(
-        "Take a picture",
-        label_visibility="collapsed"
+        "Take a picture"
     )
 
-    if camera_image is None:
+    if camera_image is not None:
 
-        st.info(
-            "📸 Camera is ready. "
-            "Take a picture to analyze your expression."
-        )
+        image = Image.open(
+            camera_image
+        ).convert("RGB")
 
-# =========================================================
-# AI ANALYSIS
-# =========================================================
 
-with right:
+else:
 
-    st.subheader("🤖 AI Analysis")
-
-    st.caption(
-        "Facial expression classification powered by machine learning."
+    uploaded_file = st.file_uploader(
+        "Upload a face image",
+        type=[
+            "jpg",
+            "jpeg",
+            "png"
+        ]
     )
 
-    # -----------------------------------------------------
-    # WAITING
-    # -----------------------------------------------------
+    if uploaded_file is not None:
 
-    if camera_image is None:
+        image = Image.open(
+            uploaded_file
+        ).convert("RGB")
 
-        st.metric(
-            "System Status",
-            "READY"
+
+# ============================================================
+# ANALYSIS
+# ============================================================
+
+if image is not None:
+
+    st.write("")
+
+    preview_col, control_col = st.columns(
+        [1.25, 0.9],
+        gap="large"
+    )
+
+    with preview_col:
+
+        st.markdown("#### 📸 Input Image")
+
+        st.image(
+            image,
+            use_container_width=True
         )
 
-        st.info(
-            "Waiting for camera input..."
-        )
+    with control_col:
+
+        st.markdown("#### 🧠 AI Ready")
 
         st.write(
-            "The system will detect the largest visible "
-            "face and classify its expression."
+            "MoodLens will locate a face, analyze "
+            "facial features and classify the "
+            "most likely emotional expression."
         )
 
-    # -----------------------------------------------------
-    # IMAGE RECEIVED
-    # -----------------------------------------------------
+        st.write("")
 
-    else:
-
-        image_bytes = camera_image.getvalue()
-
-        image_array = np.frombuffer(
-            image_bytes,
-            dtype=np.uint8
+        analyze_button = st.button(
+            "✨ Analyze Emotion",
+            use_container_width=True
         )
 
-        frame = cv2.imdecode(
-            image_array,
-            cv2.IMREAD_COLOR
+
+    # ========================================================
+    # RUN ANALYSIS
+    # ========================================================
+
+    if analyze_button:
+
+        st.divider()
+
+        st.subheader(
+            "🔍 AI Analysis"
         )
 
-        if frame is None:
+        progress = st.progress(0)
 
-            st.error(
-                "Unable to read the captured image."
+        status = st.empty()
+
+        analysis_steps = [
+            ("📷 Processing image...", 20),
+            ("👤 Detecting facial features...", 40),
+            ("🧬 Extracting expression patterns...", 60),
+            ("🧠 Running emotion model...", 80),
+            ("✨ Preparing result...", 100)
+        ]
+
+        for message, value in analysis_steps:
+
+            status.info(message)
+
+            progress.progress(
+                value
             )
 
-            st.stop()
+            time.sleep(0.35)
 
-        # -------------------------------------------------
-        # FACE DETECTION
-        # -------------------------------------------------
+
+        # ----------------------------------------------------
+        # Convert PIL -> OpenCV
+        # ----------------------------------------------------
+
+        image_array = np.asarray(
+            image
+        )
+
+        image_bgr = cv2.cvtColor(
+            image_array,
+            cv2.COLOR_RGB2BGR
+        )
 
         gray = cv2.cvtColor(
-            frame,
+            image_bgr,
             cv2.COLOR_BGR2GRAY
         )
+
+
+        # ----------------------------------------------------
+        # Face detection
+        # ----------------------------------------------------
 
         faces = face_detector.detectMultiScale(
             gray,
             scaleFactor=1.1,
             minNeighbors=5,
-            minSize=(80, 80)
+            minSize=(60, 60)
         )
 
-        # -------------------------------------------------
-        # NO FACE
-        # -------------------------------------------------
 
         if len(faces) == 0:
 
+            status.error(
+                "No clear face detected."
+            )
+
             st.warning(
-                "🔍 No face detected."
+                "Please try another image with a clear, "
+                "front-facing face and better lighting."
             )
 
-            st.write(
-                "Please face the camera directly, "
-                "make sure your face is well lit, "
-                "and try again."
+            st.stop()
+
+
+        # ----------------------------------------------------
+        # Select largest face
+        # ----------------------------------------------------
+
+        largest_face = max(
+            faces,
+            key=lambda box: box[2] * box[3]
+        )
+
+        x, y, w, h = largest_face
+
+        face_crop = image_bgr[
+            y:y+h,
+            x:x+w
+        ]
+
+
+        # ----------------------------------------------------
+        # Predict
+        # ----------------------------------------------------
+
+        emotion, confidence, predictions = (
+            predict_emotion(
+                face_crop
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # Draw face box
+        # ----------------------------------------------------
+
+        annotated = image_bgr.copy()
+
+        cv2.rectangle(
+            annotated,
+            (x, y),
+            (x+w, y+h),
+            (160, 100, 240),
+            3
+        )
+
+        annotated_rgb = cv2.cvtColor(
+            annotated,
+            cv2.COLOR_BGR2RGB
+        )
+
+        result_image = Image.fromarray(
+            annotated_rgb
+        )
+
+
+        status.success(
+            "✓ Analysis complete"
+        )
+
+        time.sleep(0.3)
+
+
+        # ====================================================
+        # RESULT
+        # ====================================================
+
+        st.divider()
+
+        st.subheader(
+            "🎭 Emotion Detected"
+        )
+
+        info = EMOTION_INFO.get(
+            emotion,
+            EMOTION_INFO["neutral"]
+        )
+
+
+        result1, result2, result3 = st.columns(
+            3,
+            gap="medium"
+        )
+
+        with result1:
+
+            st.metric(
+                "Detected Emotion",
+                f"{info['emoji']} {info['title']}"
             )
 
-        # -------------------------------------------------
-        # FACE FOUND
-        # -------------------------------------------------
+        with result2:
 
-        else:
-
-            x, y, w, h = max(
-                faces,
-                key=lambda box: box[2] * box[3]
+            st.metric(
+                "Model Confidence",
+                f"{confidence * 100:.1f}%"
             )
 
-            face = frame[
-                y:y + h,
-                x:x + w
-            ]
+        with result3:
 
-            if face.size == 0:
-
-                st.error(
-                    "Could not process the detected face."
-                )
-
-                st.stop()
-
-            # -------------------------------------------------
-            # DETECTION IMAGE
-            # -------------------------------------------------
-
-            display_frame = frame.copy()
-
-            cv2.rectangle(
-                display_frame,
-                (x, y),
-                (x + w, y + h),
-                (145, 92, 246),
-                3
+            st.metric(
+                "Faces Detected",
+                str(len(faces))
             )
 
-            cv2.putText(
-                display_frame,
-                "FACE DETECTED",
-                (x, max(30, y - 10)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (145, 92, 246),
-                2
-            )
 
-            display_rgb = cv2.cvtColor(
-                display_frame,
-                cv2.COLOR_BGR2RGB
+        st.write("")
+
+        st.success(
+            f"{info['emoji']} {info['title']}: "
+            f"{info['description']}"
+        )
+
+
+        # ====================================================
+        # RESULT IMAGE + CONFIDENCE
+        # ====================================================
+
+        result_image_col, confidence_col = st.columns(
+            [1.15, 1],
+            gap="large"
+        )
+
+        with result_image_col:
+
+            st.markdown(
+                "#### 👤 Face Analysis"
             )
 
             st.image(
-                display_rgb,
-                caption="Computer Vision Face Detection",
+                result_image,
                 use_container_width=True
             )
 
-            # -------------------------------------------------
-            # PREPROCESS
-            # -------------------------------------------------
+        with confidence_col:
 
-            face_rgb = cv2.cvtColor(
-                face,
-                cv2.COLOR_BGR2RGB
+            st.markdown(
+                "#### 🎯 Detection Confidence"
             )
 
-            face_resized = cv2.resize(
-                face_rgb,
-                (112, 112)
+            st.write(
+                "The confidence value represents the "
+                "model's relative probability for its "
+                "top predicted emotion."
             )
 
-            face_float = (
-                face_resized.astype(
-                    np.float32
-                ) / 255.0
-            )
-
-            face_float = (
-                face_float - 0.5
-            ) / 0.5
-
-            blob = cv2.dnn.blobFromImage(
-                face_float
-            )
-
-            # -------------------------------------------------
-            # AI INFERENCE
-            # -------------------------------------------------
-
-            with st.spinner(
-                "🧠 AI is analyzing facial features..."
-            ):
-
-                time.sleep(0.5)
-
-                expression_model.setInput(
-                    blob,
-                    "data"
-                )
-
-                output = expression_model.forward()
-
-            # -------------------------------------------------
-            # MODEL OUTPUT
-            # -------------------------------------------------
-
-            scores = np.asarray(
-                output
-            ).flatten()
-
-            if len(scores) < 7:
-
-                st.error(
-                    "The ML model returned an unexpected output."
-                )
-
-                st.stop()
-
-            # -------------------------------------------------
-            # SOFTMAX
-            # -------------------------------------------------
-
-            exp_scores = np.exp(
-                scores - np.max(scores)
-            )
-
-            probabilities = (
-                exp_scores
-                / np.sum(exp_scores)
-            )
-
-            # -------------------------------------------------
-            # RESULT
-            # -------------------------------------------------
-
-            emotion_index = int(
-                np.argmax(probabilities)
-            )
-
-            emotion = EMOTIONS[
-                emotion_index
-            ]
-
-            confidence = (
-                float(
-                    probabilities[
-                        emotion_index
-                    ]
-                ) * 100
-            )
-
-            # -------------------------------------------------
-            # SAVE HISTORY
-            # -------------------------------------------------
-
-            st.session_state.emotion_history.append(
-                emotion
-            )
-
-            st.session_state.confidence_history.append(
+            st.progress(
                 confidence
             )
 
-            st.session_state.scan_count += 1
-
-            st.session_state.last_emotion = emotion
-
-            # -------------------------------------------------
-            # RESULT DISPLAY
-            # -------------------------------------------------
-
-            st.divider()
-
-            st.success(
-                f"{EMOTION_EMOJI[emotion]} "
-                f"Detected Expression: "
-                f"{emotion.upper()}"
+            st.metric(
+                "Top Prediction",
+                f"{confidence * 100:.1f}%"
             )
 
-            result1, result2 = st.columns(2)
 
-            with result1:
+        # ====================================================
+        # TOP PREDICTIONS
+        # ====================================================
 
-                st.metric(
-                    "Expression",
-                    emotion.title()
-                )
+        st.divider()
 
-            with result2:
-
-                st.metric(
-                    "Confidence",
-                    f"{confidence:.1f}%"
-                )
-
-            st.progress(
-                min(
-                    confidence / 100,
-                    1.0
-                )
-            )
-
-            # -------------------------------------------------
-            # TOP 3
-            # -------------------------------------------------
-
-            st.subheader(
-                "📊 Top Expression Signals"
-            )
-
-            top_indices = np.argsort(
-                probabilities
-            )[::-1][:3]
-
-            for rank, index in enumerate(
-                top_indices,
-                start=1
-            ):
-
-                name = EMOTIONS[
-                    index
-                ]
-
-                value = (
-                    float(
-                        probabilities[index]
-                    ) * 100
-                )
-
-                st.write(
-                    f"**#{rank}** "
-                    f"{EMOTION_EMOJI[name]} "
-                    f"**{name.title()}** — "
-                    f"{value:.1f}%"
-                )
-
-# =========================================================
-# SESSION ANALYTICS
-# =========================================================
-
-st.divider()
-
-st.subheader(
-    "⚡ Session Analytics"
-)
-
-analytics1, analytics2, analytics3 = st.columns(3)
-
-with analytics1:
-
-    st.metric(
-        "Total Scans",
-        st.session_state.scan_count
-    )
-
-with analytics2:
-
-    st.metric(
-        "Last Expression",
-        (
-            f"{EMOTION_EMOJI.get(st.session_state.last_emotion, '')} "
-            f"{st.session_state.last_emotion.title()}"
-            if st.session_state.last_emotion != "None"
-            else "None"
-        )
-    )
-
-with analytics3:
-
-    if st.session_state.confidence_history:
-
-        average_confidence = np.mean(
-            st.session_state.confidence_history
+        st.subheader(
+            "📊 Emotion Probability Breakdown"
         )
 
-        st.metric(
-            "Average Confidence",
-            f"{average_confidence:.1f}%"
-        )
-
-    else:
-
-        st.metric(
-            "Average Confidence",
-            "0%"
-        )
-
-# =========================================================
-# EMOTION HISTORY
-# =========================================================
-
-if st.session_state.emotion_history:
-
-    st.divider()
-
-    st.subheader(
-        "📈 Emotion History"
-    )
-
-    history_col1, history_col2 = st.columns(
-        [1.3, 1]
-    )
-
-    # -----------------------------------------------------
-    # HISTORY CHART
-    # -----------------------------------------------------
-
-    with history_col1:
-
-        emotion_numbers = [
-            EMOTIONS.index(emotion) + 1
-            for emotion in st.session_state.emotion_history
-        ]
-
-        chart_data = {
-            "Scan": list(
-                range(
-                    1,
-                    len(emotion_numbers) + 1
-                )
-            ),
-            "Expression": emotion_numbers
-        }
-
-        st.line_chart(
-            chart_data,
-            x="Scan",
-            y="Expression"
-        )
-
-        st.caption(
-            "Expression index: 1 Angry • 2 Disgust • "
-            "3 Fearful • 4 Happy • 5 Neutral • "
-            "6 Sad • 7 Surprised"
-        )
-
-    # -----------------------------------------------------
-    # RECENT SCANS
-    # -----------------------------------------------------
-
-    with history_col2:
-
-        st.write("**Recent Scans**")
-
-        recent = list(
-            zip(
-                st.session_state.emotion_history,
-                st.session_state.confidence_history
-            )
-        )[-5:]
-
-        for number, (name, value) in enumerate(
-            reversed(recent),
+        for rank, (label, probability) in enumerate(
+            predictions,
             start=1
         ):
 
-            st.write(
-                f"**Scan {len(recent) - number + 1}:** "
-                f"{EMOTION_EMOJI[name]} "
-                f"{name.title()} — "
-                f"{value:.1f}%"
+            emotion_info = EMOTION_INFO.get(
+                label,
+                EMOTION_INFO["neutral"]
             )
 
-# =========================================================
-# ALL 7 EMOTIONS
-# =========================================================
+            percentage = (
+                probability * 100
+            )
 
-if camera_image is not None and len(faces) > 0:
+            st.write(
+                f"**{rank}. "
+                f"{emotion_info['emoji']} "
+                f"{emotion_info['title']}** — "
+                f"{percentage:.1f}%"
+            )
 
-    st.divider()
+            st.progress(
+                probability
+            )
 
-    st.subheader(
-        "🎭 Complete Expression Probability"
+
+        # ====================================================
+        # INSIGHT
+        # ====================================================
+
+        st.divider()
+
+        st.subheader(
+            "💡 AI Insight"
+        )
+
+        insight_col1, insight_col2 = st.columns(
+            2,
+            gap="large"
+        )
+
+        with insight_col1:
+
+            st.info(
+                f"The strongest detected expression is "
+                f"**{info['title']}**, with a model confidence "
+                f"of **{confidence * 100:.1f}%**."
+            )
+
+        with insight_col2:
+
+            st.warning(
+                "Facial-expression classification is an "
+                "AI estimate based on visible facial patterns. "
+                "It does not determine a person's actual feelings "
+                "or mental state."
+            )
+
+
+        # ====================================================
+        # HOW IT WORKS
+        # ====================================================
+
+        st.divider()
+
+        st.subheader(
+            "⚙️ How MoodLens Works"
+        )
+
+        step1, step2, step3, step4 = st.columns(4)
+
+        with step1:
+
+            st.markdown("### 01")
+            st.write("Image Input")
+            st.caption(
+                "Camera or uploaded image"
+            )
+
+        with step2:
+
+            st.markdown("### 02")
+            st.write("Face Detection")
+            st.caption(
+                "Computer vision locates the face"
+            )
+
+        with step3:
+
+            st.markdown("### 03")
+            st.write("ML Classification")
+            st.caption(
+                "ONNX model analyzes expression patterns"
+            )
+
+        with step4:
+
+            st.markdown("### 04")
+            st.write("Emotion Result")
+            st.caption(
+                "Top emotion and probabilities"
+            )
+
+
+# ============================================================
+# EMPTY STATE
+# ============================================================
+
+else:
+
+    st.write("")
+
+    left, right = st.columns(
+        2,
+        gap="large"
     )
 
-    emotion_chart_data = {}
+    with left:
 
-    for index, name in enumerate(EMOTIONS):
+        st.markdown(
+            "### 🔬 What MoodLens analyzes"
+        )
 
-        emotion_chart_data[
-            name.title()
-        ] = [
-            float(
-                probabilities[index]
-            ) * 100
-        ]
+        st.write(
+            "MoodLens is designed to recognize seven "
+            "facial-expression categories:"
+        )
 
-    st.bar_chart(
-        emotion_chart_data
-    )
+        st.write(
+            "😊 Happy  •  😔 Sad  •  😠 Angry  •  "
+            "😨 Fear"
+        )
 
-    st.caption(
-        "Probability distribution returned by the ML model."
-    )
+        st.write(
+            "😮 Surprise  •  🤢 Disgust  •  😐 Neutral"
+        )
 
-# =========================================================
-# SYSTEM OVERVIEW
-# =========================================================
+    with right:
 
-st.divider()
+        st.markdown(
+            "### 📷 For better results"
+        )
 
-st.subheader(
-    "🔬 System Overview"
-)
+        st.write(
+            "• Keep your face clearly visible"
+        )
 
-metric1, metric2, metric3, metric4 = st.columns(4)
+        st.write(
+            "• Use good lighting"
+        )
 
-with metric1:
-    st.metric(
-        "Expression Classes",
-        "7"
-    )
+        st.write(
+            "• Face the camera directly"
+        )
 
-with metric2:
-    st.metric(
-        "ML Model",
-        "ONNX"
-    )
+        st.write(
+            "• Avoid heavily blurred images"
+        )
 
-with metric3:
-    st.metric(
-        "Vision Engine",
-        "OpenCV"
-    )
 
-with metric4:
-    st.metric(
-        "Input",
-        "Camera"
-    )
-
-# =========================================================
-# HOW IT WORKS
-# =========================================================
-
-st.divider()
-
-st.subheader(
-    "🧩 How AI MoodLens Works"
-)
-
-step1, step2, step3, step4 = st.columns(4)
-
-with step1:
-
-    st.markdown("### 01")
-    st.write("📷 **Capture**")
-    st.caption(
-        "Camera captures a facial image."
-    )
-
-with step2:
-
-    st.markdown("### 02")
-    st.write("🔍 **Detect**")
-    st.caption(
-        "OpenCV detects the visible face."
-    )
-
-with step3:
-
-    st.markdown("### 03")
-    st.write("🧠 **Analyze**")
-    st.caption(
-        "The ONNX model analyzes facial features."
-    )
-
-with step4:
-
-    st.markdown("### 04")
-    st.write("📊 **Classify**")
-    st.caption(
-        "The model returns expression probabilities."
-    )
-
-# =========================================================
-# EXPRESSION LIBRARY
-# =========================================================
-
-st.divider()
-
-st.subheader(
-    "🎭 Expression Intelligence"
-)
-
-st.write(
-    "AI MoodLens recognizes seven visible facial-expression categories:"
-)
-
-exp1, exp2 = st.columns(2)
-
-with exp1:
-
-    st.write("😠 **Angry**")
-    st.write("🤢 **Disgust**")
-    st.write("😨 **Fearful**")
-    st.write("😊 **Happy**")
-
-with exp2:
-
-    st.write("😐 **Neutral**")
-    st.write("😔 **Sad**")
-    st.write("😮 **Surprised**")
-
-# =========================================================
-# TECHNOLOGY STACK
-# =========================================================
-
-st.divider()
-
-st.subheader(
-    "🛠 Technology Stack"
-)
-
-tech1, tech2, tech3, tech4 = st.columns(4)
-
-with tech1:
-    st.info("🐍 Python")
-
-with tech2:
-    st.info("👁 OpenCV")
-
-with tech3:
-    st.info("🧠 Machine Learning")
-
-with tech4:
-    st.info("⚙ ONNX")
-
-# =========================================================
-# RESET SESSION
-# =========================================================
-
-st.divider()
-
-if st.button(
-    "🔄 Reset Session Analytics"
-):
-
-    st.session_state.emotion_history = []
-    st.session_state.confidence_history = []
-    st.session_state.scan_count = 0
-    st.session_state.last_emotion = "None"
-
-    st.rerun()
-
-# =========================================================
-# DISCLAIMER
-# =========================================================
+# ============================================================
+# FOOTER
+# ============================================================
 
 st.divider()
 
 st.caption(
-    "⚠️ AI MoodLens classifies visible facial expressions "
-    "from an image. Facial-expression classification should "
-    "not be interpreted as a definitive measurement of a "
-    "person's actual internal emotional state."
+    "AI MoodLens • Computer Vision + Machine Learning • "
+    "Educational Project"
 )
 
 st.caption(
-    "AI MoodLens • Python + Computer Vision + Machine Learning"
+    "⚠️ MoodLens provides an AI-based facial-expression "
+    "classification and should not be treated as a definitive "
+    "assessment of a person's emotions."
 )
