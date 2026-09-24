@@ -270,35 +270,21 @@ def load_models():
     # --------------------------------------------------------
     # Face detector
     # --------------------------------------------------------
+cascade_file = (
+    BASE_DIR
+    / "haarcascades"
+    / "haarcascade_frontalface_default.xml"
+)
 
-    cascade_file = (
-        Path(cv2.__file__).resolve().parent
-        / "data"
-        / "haarcascade_frontalface_default.xml"
+if not cascade_file.exists():
+    raise FileNotFoundError(
+        f"Haar Cascade file not found: {cascade_file}"
     )
 
-    if not cascade_file.exists():
+face_detector = cv2.CascadeClassifier(str(cascade_file))
 
-        # fallback location used by OpenCV installations
-        cascade_file = (
-            Path(cv2.data.haarcascades)
-            / "haarcascade_frontalface_default.xml"
-        )
-
-    if not cascade_file.exists():
-        raise FileNotFoundError(
-            "Haar Cascade file was not found. "
-            "Please check OpenCV installation."
-        )
-
-    face_detector = cv2.CascadeClassifier(
-        str(cascade_file)
-    )
-
-    if face_detector.empty():
-        raise RuntimeError(
-            "OpenCV could not load the Haar Cascade file."
-        )
+if face_detector.empty():
+    raise RuntimeError("Could not load Haar Cascade XML file.")
 
     # --------------------------------------------------------
     # Emotion model
